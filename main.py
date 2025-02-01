@@ -1,5 +1,6 @@
-from enum import Enum, IntEnum
+from enum import Enum
 import pygame
+import numpy as np 
 
 class Emulator_State(Enum):
     QUIT = 0
@@ -19,19 +20,20 @@ class BytePusher(object):
         self.keypad = [False] * 16
         # self.mem = [0] * 16777224 # 16 MiB 
         self.mem = bytearray(16777224) # 16 MiB 
+        # self.mem = np.zeros(16777224, dtype=np.uint8) # 16 MiB 
         self.pc = 0
         self.state = Emulator_State.RUNNING
         # load color
         for r in range(6):
             for g in range(6):
                 for b in range(6):
-                    self.colormap[r*36*g*b] = (r*0x33)<<16 | (g*0x33)<<8 | b*0x33
+                    self.colormap[r*36+g*6+b] = (r*0x33)<<16 | (g*0x33)<<8 | b*0x33
 
     def load_program(self, program):
         with open(program, "rb") as f:
             i  = 0
             while (byte := f.read(1)):
-                self.mem[i] = byte
+                self.mem[i] = int.from_bytes(byte, byteorder="big")
                 i += 1
     
     def run(self):
@@ -39,11 +41,10 @@ class BytePusher(object):
         # Address 0; Bytes = 2; Keyboard state. Key X = bit X.
         key16 = self.mem[0] << 8 | self.mem[1]
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.state = Emulator_State.QUIT
-                return
+            if event.type == pygame.QUIT:self.state = Emulator_State.QUIT;return
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1:   key16 |= 0b0000_0000_0000_0010
+                if event.key == pygame.K_ESCAPE:self.state = Emulator_State.QUIT;return
+                elif event.key == pygame.K_1:   key16 |= 0b0000_0000_0000_0010
                 elif event.key == pygame.K_2: key16 |= 0b0000_0000_0000_0100
                 elif event.key == pygame.K_3: key16 |= 0b0000_0000_0000_1000
                 elif event.key == pygame.K_4: key16 |= 0b0001_0000_0000_0000
@@ -85,25 +86,38 @@ class BytePusher(object):
 
         self.mem[0] = key16 >> 8
         self.mem[1] = key16 & 0xFF
-                
         # Fetch the 3-byte program counter from address 2, and execute exactly 65536 instructions.
-        pc = self.ram[(self.ram[2] << 16) | (self.ram[3] << 8) | (self.ram[4]):]
+        pc = (self.mem[2] << 16) | (self.mem[3] << 8) | self.mem[4]
         for _ in range(65536):
-            self.mem[(pc[3] << 16) | (pc[4] << 8) | (pc[5])] = self.mem[(pc[0] << 16) | (pc[1] << 8) | (pc[2])]
-            pc = self.ram[(pc[6] << 16) | (pc[7] << 8) | (pc[8]):]
+            dst = (self.mem[pc+3] << 16) | (self.mem[pc+4] << 8) | (self.mem[pc+5])
+            src = (self.mem[pc] << 16) | (self.mem[pc+1] << 8) | (self.mem[pc+2])
+            self.mem[dst] = self.mem[src]
+            pc = (self.mem[pc+6] << 16) | (self.mem[pc+7] << 8) | (self.mem[pc+8])
 
         # Send the 64-KiB pixeldata block designated by the byte value at address 5 to the display device.
-        
-        # Send the 256-byte sampledata block designated by the 2-byte value at address 6 to the audio device.
-
-
-    
+        pixel_data_i = self.mem[5] << 16
+        for i in range(len(self.display)):
+            self.display[i] = self.colormap[self.mem[pixel_data_i]]
+            pixel_data_i += 1
+        # Send the 256-byte sampledata block designated by the 2-byte value at address 6 to the audio device
 
 if __name__ == '__main__':
     config = Config()
     bytepusher = BytePusher()
-    bytepusher.load_program("PaletteTest.BytePusher")
+    bytepusher.load_program("ScrollingLogo.BytePusher")
     pygame.init()
+    screen = pygame.display.set_mode((config.width, config.height))
+    pixels = pygame.PixelArray(screen)
+    clock = pygame.time.Clock()
 
     while bytepusher.state == Emulator_State.RUNNING: 
-        pass
+        screen.fill((0, 0, 0))
+        bytepusher.run()
+        for i in range(len(bytepusher.display)):
+            x = i % 256
+            y = i // 256
+            pixels[x, y] = bytepusher.display[i]
+        pygame.display.flip()
+        clock.tick(60)
+    
+    pygame.quit()
