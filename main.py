@@ -3,6 +3,7 @@ import numpy as np
 import pygame
 import time
 import sys
+from PIL import Image
 
 class Emulator_State(Enum):
     QUIT = 0
@@ -121,6 +122,7 @@ if __name__ == '__main__':
     pixels = pygame.PixelArray(screen)
     clock = pygame.time.Clock()
     start_time = pygame.time.get_ticks()
+    frames = []
     pygame.mixer.init(frequency=15360, size=-8, channels=1, buffer=256)
     screen.fill((0, 0, 0))
     while bytepusher.state == Emulator_State.RUNNING: 
@@ -132,7 +134,18 @@ if __name__ == '__main__':
                 y = (i // 256)
                 pixels[x, y] = bytepusher.display[i]
             start_time = pygame.time.get_ticks()
+        frame = pygame.surfarray.array3d(pygame.display.get_surface())
+        frame = np.transpose(frame, (1, 0, 2))
+        frames.append(frame)
         pygame.display.flip()
         clock.tick(60)
     
+    image_frames = []
+    for frame in frames:
+        # Convert each Pygame surface array into a Pillow Image
+        pil_image = Image.fromarray(frame)
+        image_frames.append(pil_image)
+
+    # Save the frames as a GIF
+    image_frames[0].save("output.gif", save_all=True, append_images=image_frames[1:], duration=100, loop=0)
     pygame.quit()
