@@ -4,9 +4,9 @@ BytePusher is a minimalist virtual machine. Minimalist in the sense that it is a
 
 Examples  
 
-![Nyan](./assets/cat.gif)  
+![Nyan](./assets/cat.gif)
 ![MunchingSquare](./assets/MunchingSquare.gif)  
-![AudioWave](./assets/Audio.gif)  
+![AudioWave](./assets/Audio.gif)
 ![Scrolling](./assets/scrolling.gif)  
-![Palette](./assets/Palette.gif)  
+![Palette](./assets/Palette.gif)
 ![Sprites](./assets/Sprites.gif)  
